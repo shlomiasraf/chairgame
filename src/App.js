@@ -153,8 +153,7 @@ export default function App() {
               user && userRequirements[user]
                 ? userRequirements[user].computer === position.computer &&
                   userRequirements[user].phone === position.phone &&
-                  userRequirements[user].tablet === position.tablet &&
-                  (!position.tablet || position.infrastructure.canConnectTablet)
+                  userRequirements[user].tablet === position.tablet
                 : true;
             
             const isInfraOnlyError = hasInfraMismatch && userMatch;
