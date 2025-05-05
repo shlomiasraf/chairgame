@@ -1,11 +1,10 @@
 import { useState } from "react";
 
 const generateRoom = () => {
-  const colors = ["red", "green", "blue"];
+  const colors = ["אדום", "ירוק", "כחול"];
   const names = [
     "דני", "רון", "הילה", "יוסי", "נועה", "אמיר", "שירה",
-    "לירון", "דפנה",
-    "אורי", "תמר", "רן", "מאיה", "גיא", "רוני", "אור"
+    "לירון", "דפנה", "אורי", "תמר", "רן", "מאיה", "גיא", "רוני", "אור"
   ];
   const room = [];
   for (let i = 0; i < 16; i++) {
@@ -13,12 +12,20 @@ const generateRoom = () => {
     const comp = colors[Math.floor(Math.random() * colors.length)];
     const phone = colors[Math.floor(Math.random() * colors.length)];
     const tablet = Math.random() > 0.5;
+    const infraComp = colors[Math.floor(Math.random() * colors.length)];
+    const infraPhone = colors[Math.floor(Math.random() * colors.length)];
+    const canConnectTablet = Math.random() > 0.5;
     room.push({
       id: i + 1,
       user: name,
       computer: comp,
       phone: phone,
-      tablet: tablet
+      tablet: tablet,
+      infrastructure: {
+        computer: infraComp,
+        phone: infraPhone,
+        canConnectTablet: canConnectTablet
+      }
     });
   }
   return room;
@@ -72,7 +79,7 @@ export default function App() {
 
     if (req.tablet !== position.tablet) {
       issues.push(
-        `❌ טאבלט ${req.tablet ? "נדרש" : "לא נדרש"} אך קיים מצב ${position.tablet ? "כן" : "לא"}`
+        `❌ טאבלט ${req.tablet ? "נדרש למשתמש אך לא נמצא בעמדה" : "לא נדרש למשתמש אך נמצא בעמדה"}`
       );
     } else {
       issues.push("✔ טאבלט תקין");
@@ -94,6 +101,25 @@ export default function App() {
     const newRoom = [...room];
     const fromIndex = newRoom.findIndex(pos => pos.id === sourceId);
     const toIndex = newRoom.findIndex(pos => pos.id === targetId);
+
+    const sourceValue = newRoom[fromIndex][itemType];
+
+    // בדיקת התאמת תשתית
+    if (itemType === "computer") {
+      const targetInfra = newRoom[toIndex].infrastructure.computer;
+      if (targetInfra !== sourceValue) {
+        alert(`❌ לא ניתן להעביר מחשב מסוג ${sourceValue} לעמדה עם תשתית מסוג ${targetInfra}`);
+        return;
+      }
+    }
+
+    if (itemType === "tablet") {
+      const canConnectTablet = newRoom[toIndex].infrastructure.canConnectTablet;
+      if (!canConnectTablet) {
+        alert(`❌ בעמדה זו אין תשתית לטאבלט – לא ניתן להעביר`);
+        return;
+      }
+    }
 
     const temp = newRoom[fromIndex][itemType];
     newRoom[fromIndex][itemType] = newRoom[toIndex][itemType];
@@ -119,28 +145,37 @@ export default function App() {
               }
               const position = room[index];
               const user = position.user;
-              const match =
-                user && userRequirements[user]
-                  ? userRequirements[user].computer === position.computer &&
-                    userRequirements[user].phone === position.phone &&
-                    userRequirements[user].tablet === position.tablet
-                  : true;
-
+              const hasInfraMismatch =
+              position.computer !== position.infrastructure.computer ||
+              (position.tablet && !position.infrastructure.canConnectTablet);
+            
+            const userMatch =
+              user && userRequirements[user]
+                ? userRequirements[user].computer === position.computer &&
+                  userRequirements[user].phone === position.phone &&
+                  userRequirements[user].tablet === position.tablet &&
+                  (!position.tablet || position.infrastructure.canConnectTablet)
+                : true;
+            
+            const isInfraOnlyError = hasInfraMismatch && userMatch;
               return (
-                <div
-                  key={colIndex}
-                  style={{
-                    padding: "12px",
-                    borderRadius: "12px",
-                    border: "2px solid",
-                    borderColor: match ? "green" : "red",
-                    background: match ? "#e6ffe6" : "#ffe6e6",
-                    minWidth: "160px"
-                  }}
+              <div
+                key={colIndex}
+                style={{
+                  padding: "12px",
+                  borderRadius: "12px",
+                  border: "2px solid",
+                  borderColor: isInfraOnlyError ? "purple" : userMatch ? "green" : "red",
+                  background: isInfraOnlyError ? "#f3e6ff" : userMatch ? "#e6ffe6" : "#ffe6e6",
+                  minWidth: "160px"
+                }}
                   onDrop={e => handleDrop(e, position.id)}
                   onDragOver={e => e.preventDefault()}
                 >
                   <h4>עמדה {position.id}</h4>
+                  <p style={{ fontSize: "0.85em", color: "gray" }}>
+                    תשתית 🖥️: {position.infrastructure.computer} | 📞: {position.infrastructure.phone} | 📱: {position.infrastructure.canConnectTablet ? "כן" : "לא"}
+                  </p>
                   <p
                     draggable
                     onDragStart={e => handleDragStart(e, position.id, "computer")}

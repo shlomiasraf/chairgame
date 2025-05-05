@@ -4,30 +4,30 @@ const initialRoom = [
   {
     id: 1,
     user: "דני",
-    computer: "red",
-    phone: "green",
+    computer: "אדום",
+    phone: "ירוק",
     tablet: true
   },
   {
     id: 2,
     user: "רון",
-    computer: "blue",
-    phone: "green",
+    computer: "כחול",
+    phone: "ירוק",
     tablet: false
   },
   {
     id: 3,
     user: "הילה",
-    computer: "red",
-    phone: "blue",
+    computer: "אדום",
+    phone: "כחול",
     tablet: true
   }
 ];
 
 const userRequirements = {
-  "דני": { computer: "red", phone: "green", tablet: true },
-  "רון": { computer: "red", phone: "green", tablet: false },
-  "הילה": { computer: "red", phone: "blue", tablet: true }
+  "דני": { computer: "אדום", phone: "ירוק", tablet: true },
+  "רון": { computer: "אדום", phone: "ירוק", tablet: false },
+  "הילה": { computer: "אדום", phone: "כחול", tablet: true }
 };
 
 export default function App() {
@@ -69,7 +69,7 @@ export default function App() {
               padding: "16px",
               borderRadius: "12px",
               border: "2px solid",
-              borderColor: match ? "green" : "red",
+              borderColor: match ? "ירוק" : "אדום",
               background: match ? "#e6ffe6" : "#ffe6e6",
               width: "200px"
             }}
