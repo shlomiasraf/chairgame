@@ -1,86 +1,169 @@
-import { useState } from "react";
-
-const generateRoom = () => {
-  const colors = ["אדום", "ירוק", "כחול"];
-  const names = [
-    "דני", "רון", "הילה", "יוסי", "נועה", "אמיר", "שירה",
-    "לירון", "דפנה", "אורי", "תמר", "רן", "מאיה", "גיא", "רוני", "אור"
-  ];
-  const room = [];
-  for (let i = 0; i < 16; i++) {
-    const name = names[i];
-    const comp = colors[Math.floor(Math.random() * colors.length)];
-    const phone = colors[Math.floor(Math.random() * colors.length)];
-    const tablet = Math.random() > 0.5;
-    const infraComp = colors[Math.floor(Math.random() * colors.length)];
-    const infraPhone = colors[Math.floor(Math.random() * colors.length)];
-    const canConnectTablet = Math.random() > 0.5;
-    room.push({
-      id: i + 1,
-      user: name,
-      computer: comp,
-      phone: phone,
-      tablet: tablet,
-      infrastructure: {
-        computer: infraComp,
-        phone: infraPhone,
-        canConnectTablet: canConnectTablet
-      }
-    });
-  }
-  return room;
-};
-
-const generateRequirements = room => {
-  const reqs = {};
-  room.forEach(r => {
-    reqs[r.user] = {
-      computer: r.computer,
-      phone: r.phone,
-      tablet: r.tablet
-    };
-  });
-  return reqs;
-};
+import { useEffect, useState } from "react";
+import axios from "axios";
 
 const Placeholder = () => (
-  <div
-    style={{
-      minWidth: "160px",
-      padding: "12px",
-      borderRadius: "12px",
-      border: "2px solid transparent",
-      background: "transparent"
-    }}
-  ></div>
+  <div style={{ minWidth: "160px", padding: "12px", border: "2px solid transparent" }} />
 );
 
 export default function App() {
-  const [room, setRoom] = useState(generateRoom());
-  const [userRequirements] = useState(generateRequirements(room));
+  const [room, setRoom] = useState([]);
+  const [userRequirements, setUserRequirements] = useState({});
   const [selectedUser, setSelectedUser] = useState(null);
 
-  const getIssues = (user, position) => {
-    const req = userRequirements[user];
-    if (!req) return [];
-    const issues = [];
+  const getColorFromStatus = (status_colors) => {
+    if (!status_colors) return "gray";
+    if (status_colors.includes("green")) return "green";
+    if (status_colors.includes("red")) return "red";
+    if (status_colors.includes("purple")) return "purple";
+    if (status_colors.includes("orange")) return "orange";
+    return "gray";
+  };
+  
+  const layout = [
+    [6, 5, 4, 3, 2, 1, 0],
+    [13, 12, 11, null, 10, 9, 8, null, 7],
+    [14, 17, null, null, 20, 23, null, 26],
+    [15, 18, null, null, 21, 24, null, 27],
+    [16, 19, null, null, 22, 25, null, 28],
+  ];
 
-    if (req.computer !== position.computer) {
-      issues.push(`❌ מחשב שגוי (צריך ${req.computer}, יש ${position.computer})`);
-    } else {
-      issues.push("✔ מחשב תקין");
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const { data } = await axios.get("http://localhost:3001/api/stations");
+  
+        const mappedRoom = data.map((s, index) => {
+          const toBool = val => Boolean(Number(val)); // המרה בטוחה
+  
+          const computers = [];
+          if (toBool(s.has_pc_red)) computers.push("אדום");
+          if (toBool(s.has_pc_green)) computers.push("ירוק");
+          if (toBool(s.has_pc_blue)) computers.push("כחול");
+  
+          const infraComputers = [];
+          if (toBool(s.supports_pc_red)) infraComputers.push("אדום");
+          if (toBool(s.supports_pc_green)) infraComputers.push("ירוק");
+          if (toBool(s.supports_pc_blue)) infraComputers.push("כחול");
+  
+          let phone = "אין";
+          if (toBool(s.has_phone_red)) phone = "אדום";
+          else if (toBool(s.has_phone_green)) phone = "ירוק";
+          else if (toBool(s.has_phone_blue)) phone = "כחול";
+  
+          let infraPhone = "אין";
+          if (toBool(s.supports_phone_red)) infraPhone = "אדום";
+          else if (toBool(s.supports_phone_green)) infraPhone = "ירוק";
+          else if (toBool(s.supports_phone_blue)) infraPhone = "כחול";
+  
+          return {
+            id: index,
+            user: s.employee_name,
+            computers,
+            phone,
+            tablet: toBool(s.has_tablet),
+            infrastructure: {
+              computers: infraComputers,
+              phone: infraPhone,
+              canConnectTablet: toBool(s.supports_tablet)
+            },
+             status_colors: s.status_colors
+          };
+        });
+  
+        const mappedReqs = {};
+        data.forEach(s => {
+          const toBool = val => Boolean(Number(val));
+  
+          const comps = [];
+          if (toBool(s.need_pc_red)) comps.push("אדום");
+          if (toBool(s.need_pc_green)) comps.push("ירוק");
+          if (toBool(s.need_pc_blue)) comps.push("כחול");
+  
+          mappedReqs[s.employee_name] = {
+            computers: comps,
+            phone: toBool(s.need_phone_red) ? "אדום" : toBool(s.need_phone_green) ? "ירוק" : toBool(s.need_phone_blue) ? "כחול" : "אין",
+            tablet: toBool(s.need_tablet)
+          };
+        });
+  
+        setRoom(mappedRoom);
+        setUserRequirements(mappedReqs);
+      } catch (err) {
+        console.error("שגיאה בטעינת הנתונים מהשרת:", err);
+      }
+    };
+  
+    fetchData();
+  }, []);
+  
+
+  const handleDragStart = (e, sourceId, computerIndex) => {
+    e.dataTransfer.setData("sourceId", sourceId);
+    e.dataTransfer.setData("computerIndex", computerIndex);
+  };
+
+  const handleDrop = (e, targetId) => {
+    const sourceId = parseInt(e.dataTransfer.getData("sourceId"));
+    const computerIndex = e.dataTransfer.getData("computerIndex");
+    if (sourceId === targetId) return;
+
+    const newRoom = [...room];
+    const source = newRoom.find(pos => pos.id === sourceId);
+    const target = newRoom.find(pos => pos.id === targetId);
+
+    const dragged = computerIndex === "phone" ? "phone" :
+                    computerIndex === "tablet" ? "tablet" :
+                    source.computers[parseInt(computerIndex)];
+
+    if (computerIndex !== "phone" && computerIndex !== "tablet") {
+      if (!target.infrastructure.computers.includes(dragged)) {
+        alert(`❌ אין תשתית למחשב מסוג ${dragged}`);
+        return;
+      }
+
+      source.computers.splice(parseInt(computerIndex), 1);
+      target.computers.push(dragged);
+    } else if (computerIndex === "phone") {
+      if (!target.infrastructure.phone.includes(source.phone)) {
+        alert(`❌ אין תשתית לטלפון בצבע ${source.phone}`);
+        return;
+      }
+      const tmp = source.phone;
+      source.phone = target.phone;
+      target.phone = tmp;
+    } else if (computerIndex === "tablet") {
+      if (!target.infrastructure.canConnectTablet) {
+        alert("❌ אין תשתית לטאבלט");
+        return;
+      }
+      const tmp = source.tablet;
+      source.tablet = target.tablet;
+      target.tablet = tmp;
     }
 
-    if (req.phone !== position.phone) {
-      issues.push(`❌ טלפון שגוי (צריך ${req.phone}, יש ${position.phone})`);
+    setRoom(newRoom);
+  };
+
+  const getIssues = (user, pos) => {
+    const req = userRequirements[user];
+    if (!req) return [];
+
+    const issues = [];
+    const match = req.computers.every(c => pos.computers.includes(c));
+    if (!match) {
+      issues.push(`❌ מחשבים חסרים: ${req.computers.join(", ")}`);
+    } else {
+      issues.push("✔ מחשבים תקינים");
+    }
+
+    if (req.phone !== pos.phone) {
+      issues.push(`❌ טלפון לא תואם: נדרש ${req.phone}`);
     } else {
       issues.push("✔ טלפון תקין");
     }
 
-    if (req.tablet !== position.tablet) {
-      issues.push(
-        `❌ טאבלט ${req.tablet ? "נדרש למשתמש אך לא נמצא בעמדה" : "לא נדרש למשתמש אך נמצא בעמדה"}`
-      );
+    if (req.tablet !== pos.tablet) {
+      issues.push(`❌ טאבלט ${req.tablet ? "נדרש אך חסר" : "קיים אך לא נדרש"}`);
     } else {
       issues.push("✔ טאבלט תקין");
     }
@@ -88,111 +171,62 @@ export default function App() {
     return issues;
   };
 
-  const handleDragStart = (e, sourceId, itemType) => {
-    e.dataTransfer.setData("sourceId", sourceId);
-    e.dataTransfer.setData("itemType", itemType);
-  };
-
-  const handleDrop = (e, targetId) => {
-    const sourceId = parseInt(e.dataTransfer.getData("sourceId"));
-    const itemType = e.dataTransfer.getData("itemType");
-    if (sourceId === targetId) return;
-
-    const newRoom = [...room];
-    const fromIndex = newRoom.findIndex(pos => pos.id === sourceId);
-    const toIndex = newRoom.findIndex(pos => pos.id === targetId);
-
-    const sourceValue = newRoom[fromIndex][itemType];
-
-    // בדיקת התאמת תשתית
-    if (itemType === "computer") {
-      const targetInfra = newRoom[toIndex].infrastructure.computer;
-      if (targetInfra !== sourceValue) {
-        alert(`❌ לא ניתן להעביר מחשב מסוג ${sourceValue} לעמדה עם תשתית מסוג ${targetInfra}`);
-        return;
-      }
-    }
-
-    if (itemType === "tablet") {
-      const canConnectTablet = newRoom[toIndex].infrastructure.canConnectTablet;
-      if (!canConnectTablet) {
-        alert(`❌ בעמדה זו אין תשתית לטאבלט – לא ניתן להעביר`);
-        return;
-      }
-    }
-
-    const temp = newRoom[fromIndex][itemType];
-    newRoom[fromIndex][itemType] = newRoom[toIndex][itemType];
-    newRoom[toIndex][itemType] = temp;
-
-    setRoom(newRoom);
-  };
-
-  const layout = [
-    [0, 1, 2, 3, 4, 5, 6],
-    [7, null, null, null, null, null, 8],
-    [9, 10, 11, 12, 13, 14, 15]
-  ];
-
   return (
     <div style={{ padding: "20px", direction: "rtl" }}>
       <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
         {layout.map((row, rowIndex) => (
           <div key={rowIndex} style={{ display: "flex", gap: "16px", justifyContent: "center" }}>
             {row.map((index, colIndex) => {
-              if (index === null) {
-                return <Placeholder key={colIndex} />;
-              }
-              const position = room[index];
-              const user = position.user;
-              const hasInfraMismatch =
-              position.computer !== position.infrastructure.computer ||
-              (position.tablet && !position.infrastructure.canConnectTablet);
-            
-            const userMatch =
-              user && userRequirements[user]
-                ? userRequirements[user].computer === position.computer &&
-                  userRequirements[user].phone === position.phone &&
-                  userRequirements[user].tablet === position.tablet
-                : true;
-            
-            const isInfraOnlyError = hasInfraMismatch && userMatch;
+              if (index === null) return <Placeholder key={colIndex} />;
+              const pos = room[index];
+              if (!pos) return <Placeholder key={colIndex} />;
+              
+              const user = pos.user; 
+              const color = getColorFromStatus(pos.status_colors);
+              const bgColor = {
+                green: "#e6ffe6",
+                red: "#ffe6e6",
+                purple: "#f0e6ff",
+                orange: "#fff4e6",
+              }[color] || "#f0f0f0";
+
               return (
-              <div
-                key={colIndex}
-                style={{
-                  padding: "12px",
-                  borderRadius: "12px",
-                  border: "2px solid",
-                  borderColor: isInfraOnlyError ? "purple" : userMatch ? "green" : "red",
-                  background: isInfraOnlyError ? "#f3e6ff" : userMatch ? "#e6ffe6" : "#ffe6e6",
-                  minWidth: "160px"
-                }}
-                  onDrop={e => handleDrop(e, position.id)}
+                <div
+                  key={colIndex}
+                  onDrop={e => handleDrop(e, pos.id)}
                   onDragOver={e => e.preventDefault()}
+                  style={{
+                    padding: "12px",
+                    borderRadius: "12px",
+                    border: `2px solid ${color}`,
+                    background: bgColor,
+                    minWidth: "110px"
+                  }}
                 >
-                  <h4>עמדה {position.id}</h4>
-                  <p style={{ fontSize: "0.85em", color: "gray" }}>
-                    תשתית 🖥️: {position.infrastructure.computer} | 📞: {position.infrastructure.phone} | 📱: {position.infrastructure.canConnectTablet ? "כן" : "לא"}
-                  </p>
+                  <h4>עמדה {pos.id + 1}</h4>
+                  <p>תשתית 🖥️: {pos.infrastructure.computers.join(", ")} | 📞: {pos.infrastructure.phone} | 📱: {pos.infrastructure.canConnectTablet ? "כן" : "לא"}</p>
+                  <p style={{ fontWeight: "bold" }}>מחשבים: {pos.computers.join(", ")}</p>
+                  {pos.computers.map((c, i) => (
+                    <p
+                      key={i}
+                      draggable
+                      onDragStart={e => handleDragStart(e, pos.id, i)}
+                      style={{ cursor: "grab" }}
+                    >
+                      🖥️ {c}
+                    </p>
+                  ))}
                   <p
                     draggable
-                    onDragStart={e => handleDragStart(e, position.id, "computer")}
+                    onDragStart={e => handleDragStart(e, pos.id, "phone")}
                     style={{ cursor: "grab" }}
                   >
-                    🖥️ מחשב: {position.computer}
+                    📞 טלפון: {pos.phone}
                   </p>
-                  <p
-                    draggable
-                    onDragStart={e => handleDragStart(e, position.id, "phone")}
-                    style={{ cursor: "grab" }}
-                  >
-                    📞 טלפון: {position.phone}
-                  </p>
-                  {position.tablet && (
+                  {pos.tablet && (
                     <p
                       draggable
-                      onDragStart={e => handleDragStart(e, position.id, "tablet")}
+                      onDragStart={e => handleDragStart(e, pos.id, "tablet")}
                       style={{ cursor: "grab" }}
                     >
                       📱 טאבלט
@@ -207,13 +241,10 @@ export default function App() {
                           padding: "6px",
                           border: "1px solid gray",
                           borderRadius: "6px",
-                          cursor: "pointer",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "space-between"
+                          cursor: "pointer"
                         }}
                       >
-                        {user} <span role="img" aria-label="user">👤</span>
+                        {user} 👤
                       </div>
                     ) : (
                       <div style={{ color: "gray", fontStyle: "italic" }}>עמדה ריקה</div>
